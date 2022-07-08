@@ -192,8 +192,24 @@ function animate() {
     // this is a simple "lights off" animation. It's not really a cellular automata, but it works well enough.
     for (let i = Math.floor(x - canvas.width / zoom / 2); i < x + canvas.width / zoom / 2; i++) {
         for (let j = Math.floor(y - canvas.height / zoom / 2); j < y + canvas.height / zoom / 2; j++) {
+            // game of life
+            let neighbors = 0;
+            for (let k = -1; k <= 1; k++) {
+                for (let l = -1; l <= 1; l++) {
+                    if (grid[hash(i + k, j + l)] == 1) {
+                        neighbors++;
+                    }
+                }
+            }
+            
             if (grid[hash(i, j)] == 1) {
-                grid[hash(i, j)] = generate(i, j, mode = RANDOM, prob = 0.85);
+                if (neighbors < 2 || neighbors > 3) {
+                    grid[hash(i, j)] = 0;
+                }
+            } else {
+                if (neighbors == 3) {
+                    grid[hash(i, j)] = 1;
+                }
             }
         }
     }
