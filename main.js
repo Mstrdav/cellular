@@ -1,13 +1,21 @@
 var canvas, ctx;
+
+// zoom and offset
 var zoom = 12.5;
 var x = 0;
 var y = 0;
 
+// filling modes
 const FULL = 1;
 const EMPTY = 0;
 const RANDOM = -1;
 
+const INIT_MODE = EMPTY;
+const EXTEND_MODE = EMPTY;
+
+// animation variables
 var isAnimated = false;
+var step;
 
 // the grid is a hashtable
 var grid = {};
@@ -50,7 +58,7 @@ function initGrid() {
     // fill grid with empty cells
     for (var i = Math.floor(x - canvas.width / zoom / 2); i < x + canvas.width / zoom / 2; i++) {
         for (var j = Math.floor(y - canvas.height / zoom / 2); j < y + canvas.height / zoom / 2; j++) {
-            grid[hash(i, j)] = generate(i, j, mode = FULL, prob = 0.05);
+            grid[hash(i, j)] = generate(i, j, mode = INIT_MODE, prob = 0.05);
         }
     }
 }
@@ -85,7 +93,7 @@ window.onresize = function () {
     for (let i = Math.floor(x - canvas.width / zoom / 2); i < x + canvas.width / zoom / 2; i++) {
         for (let j = Math.floor(y - canvas.height / zoom / 2); j < y + canvas.height / zoom / 2; j++) {
             if (!(hash(i, j) in grid)) {
-                grid[hash(i, j)] = generate(i, j, mode = FULL, prob = 0.05);
+                grid[hash(i, j)] = generate(i, j, mode = EXTEND_MODE, prob = 0.05);
             }
         }
     }
@@ -102,7 +110,7 @@ function moveGrid(dx, dy) {
     for (let i = Math.floor(x - canvas.width / zoom / 2); i < x + canvas.width / zoom / 2; i++) {
         for (let j = Math.floor(y - canvas.height / zoom / 2); j < y + canvas.height / zoom / 2; j++) {
             if (!(hash(i, j) in grid)) {
-                grid[hash(i, j)] = generate(i, j, mode = FULL, prob = 0.05);
+                grid[hash(i, j)] = generate(i, j, mode = EXTEND_MODE, prob = 0.05);
             }
         }
     }
@@ -129,7 +137,7 @@ function zoomGrid(dz) {
     for (let i = Math.floor(x - canvas.width / zoom / 2); i < x + canvas.width / zoom / 2; i++) {
         for (let j = Math.floor(y - canvas.height / zoom / 2); j < y + canvas.height / zoom / 2; j++) {
             if (!(hash(i, j) in grid)) {
-                grid[hash(i, j)] = generate(i, j, mode = FULL, prob = 0.05);
+                grid[hash(i, j)] = generate(i, j, mode = EXTEND_MODE, prob = 0.05);
             }
         }
     }
@@ -177,7 +185,7 @@ function initEventListeners() {
 
             if (isAnimated) {
                 isAnimated = false;
-                window.cancelAnimationFrame();
+                window.cancelAnimationFrame(step);
                 return;
             }
 
@@ -185,32 +193,49 @@ function initEventListeners() {
             animate();
         }
     });
+
+    // reset grid when r is pressed
+    document.addEventListener('keydown', function (e) {
+        if (e.key == "r") {
+            grid = {};
+            drawGrid();
+        }
+    });
+
+    // change cell state when mouse is clicked
+    canvas.addEventListener('mousedown', function (e) {
+        var rect = canvas.getBoundingClientRect();
+        let mousex = e.clientX - rect.left;
+        let mousey = e.clientY - rect.top;
+        let i = Math.floor((mousex - canvas.width / 2) / zoom + x);
+        let j = Math.floor((mousey - canvas.height / 2) / zoom + y);
+        let cell = grid[hash(i, j)];
+        grid[hash(i, j)] = cell == 1 ? 0 : 1;
+        drawGrid();
+    });
 }
 
 // animate
 function animate() {
-    // this is a simple "lights off" animation. It's not really a cellular automata, but it works well enough.
+    let newGrid = {};
     for (let i = Math.floor(x - canvas.width / zoom / 2); i < x + canvas.width / zoom / 2; i++) {
         for (let j = Math.floor(y - canvas.height / zoom / 2); j < y + canvas.height / zoom / 2; j++) {
             // game of life
-            let neighbors = 0;
-            for (let k = -1; k <= 1; k++) {
-                for (let l = -1; l <= 1; l++) {
-                    if (grid[hash(i + k, j + l)] == 1) {
-                        neighbors++;
-                    }
-                }
-            }
+            let neighbors = countNeighbors(i, j);
             
-            if (grid[hash(i, j)] == 1) {
-                if (neighbors < 2 || neighbors > 3) {
-                    grid[hash(i, j)] = 0;
-                }
+            if (neighbors < 2 || neighbors > 3) {
+                newGrid[hash(i, j)] = 0;
+            } else if (neighbors == 3) {
+                newGrid[hash(i, j)] = 1;    
             } else {
-                if (neighbors == 3) {
-                    grid[hash(i, j)] = 1;
-                }
+                newGrid[hash(i, j)] = grid[hash(i, j)];
             }
+        }
+    }
+
+    for (let i = Math.floor(x - canvas.width / zoom / 2); i < x + canvas.width / zoom / 2; i++) {
+        for (let j = Math.floor(y - canvas.height / zoom / 2); j < y + canvas.height / zoom / 2; j++) {
+            grid[hash(i, j)] = newGrid[hash(i, j)];
         }
     }
 
@@ -219,6 +244,19 @@ function animate() {
 
     // if animation is running, call animate again
     if (isAnimated) {
-        window.requestAnimationFrame(animate);
+        step = window.requestAnimationFrame(animate);
     }
+}
+
+// count neighbors
+function countNeighbors(i, j) {
+    let neighbors = -grid[hash(i,j)];
+    for (let x = i - 1; x <= i + 1; x++) {
+        for (let y = j - 1; y <= j + 1; y++) {
+            if (hash(x, y) in grid && grid[hash(x, y)] == 1) {
+                neighbors++;
+            }
+        }
+    }
+    return neighbors;
 }
